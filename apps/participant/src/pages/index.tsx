@@ -14,6 +14,14 @@ export default function ParticipantApp() {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
 
   useEffect(() => {
+    const savedCode = localStorage.getItem('team_code');
+    if (savedCode) {
+      setTeamCode(savedCode);
+      setJoined(true);
+    }
+  }, []);
+
+  useEffect(() => {
     if (joined) {
       const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(BACKEND_URL);
       socketRef.current = socket;
@@ -40,6 +48,20 @@ export default function ParticipantApp() {
     }
   }, [joined, teamCode]);
 
+  const handleJoin = () => {
+    if (teamCode.length > 0) {
+      localStorage.setItem('team_code', teamCode.toUpperCase());
+      setJoined(true);
+    }
+  };
+
+  const handleLeave = () => {
+    localStorage.removeItem('team_code');
+    setJoined(false);
+    setTeamCode('');
+    if (socketRef.current) socketRef.current.disconnect();
+  };
+
   const handleBuzz = () => {
     if (!socketRef.current || !currentQuestion) return;
     socketRef.current.emit('buzz', { teamCode, questionId: currentQuestion.id });
@@ -59,7 +81,7 @@ export default function ParticipantApp() {
             onChange={(e) => setTeamCode(e.target.value.toUpperCase())}
           />
           <button
-            onClick={() => { if (teamCode.length > 0) setJoined(true); }}
+            onClick={handleJoin}
             className="w-full bg-[#3DDC84] text-black border-4 border-black box-shadow-brutal py-4 text-2xl font-bold uppercase hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all"
           >
             Enter
@@ -83,20 +105,25 @@ export default function ParticipantApp() {
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-200 ${btnColor}`}>
-      <div className="absolute top-4 left-4 border-4 border-black bg-white px-4 py-2 font-bold box-shadow-brutal">
-        TEAM: {teamCode}
+      <div className="absolute top-4 left-4 flex space-x-2">
+        <div className="border-4 border-black bg-white px-4 py-2 font-bold box-shadow-brutal flex items-center justify-center">
+          TEAM: {teamCode}
+        </div>
+        <button onClick={handleLeave} className="border-4 border-black bg-red-500 text-white px-4 py-2 font-bold box-shadow-brutal active:translate-y-1 active:translate-x-1 active:shadow-none">
+          Leave
+        </button>
       </div>
       
       {currentQuestion && (
-        <div className="absolute top-20 text-center max-w-2xl px-4 py-2 bg-white border-4 border-black box-shadow-brutal">
+        <div className="absolute top-24 text-center max-w-2xl px-4 py-2 bg-white border-4 border-black box-shadow-brutal">
           <p className="text-xl font-bold">{currentQuestion.text}</p>
         </div>
       )}
 
       <button
         onClick={handleBuzz}
-        disabled={lockedReason !== null}
-        className={`w-64 h-64 sm:w-80 sm:h-80 rounded-full border-8 border-black box-shadow-brutal font-black text-4xl sm:text-6xl uppercase transition-transform active:translate-y-2 active:translate-x-2 active:shadow-none ${btnColor}`}
+        disabled={lockedReason !== null || !isLive}
+        className={`w-64 h-64 sm:w-80 sm:h-80 rounded-full border-8 border-black box-shadow-brutal font-black text-4xl sm:text-6xl uppercase transition-transform active:translate-y-2 active:translate-x-2 active:shadow-none disabled:active:translate-y-0 disabled:active:translate-x-0 ${btnColor}`}
       >
         {btnText}
       </button>

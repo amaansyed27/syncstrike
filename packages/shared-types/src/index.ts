@@ -18,8 +18,10 @@ export interface BuzzEvent {
 
 export interface LeaderboardEntry {
   teamCode: string;
+  teamName: string;
   hitTime: number;
   rank: number;
+  isWrong: boolean;
 }
 
 // Server to client events
@@ -30,6 +32,7 @@ export interface ServerToClientEvents {
   buzz_acknowledged: () => void;
   leaderboard_update: (data: { leaderboard: LeaderboardEntry[] }) => void;
   state_update: (data: { isLive: boolean; currentQuestion: Question | null }) => void;
+  answering_team: (data: { team: LeaderboardEntry | null }) => void;
 }
 
 // Client to server events
