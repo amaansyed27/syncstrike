@@ -31,7 +31,7 @@ export interface ServerToClientEvents {
   buzz_locked: (data: { reason: string }) => void;
   buzz_acknowledged: () => void;
   leaderboard_update: (data: { leaderboard: LeaderboardEntry[] }) => void;
-  state_update: (data: { isLive: boolean; currentQuestion: Question | null }) => void;
+  state_update: (data: { isLive: boolean; currentQuestion: Question | null; endTime?: number }) => void;
   answering_team: (data: { team: LeaderboardEntry | null }) => void;
 }
 

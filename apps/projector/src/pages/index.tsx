@@ -9,6 +9,8 @@ export default function ProjectorApp() {
   const [isLive, setIsLive] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [answeringTeam, setAnsweringTeam] = useState<LeaderboardEntry | null>(null);
+  const [endTime, setEndTime] = useState<number | undefined>(undefined);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   
   // App State: 'home' | 'leaderboard'
   const [activeTab, setActiveTab] = useState<'home' | 'leaderboard'>('home');
@@ -17,9 +19,10 @@ export default function ProjectorApp() {
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(BACKEND_URL);
     socket.emit('join_room', { role: 'projector' });
 
-    socket.on('state_update', ({ isLive, currentQuestion }) => {
+    socket.on('state_update', ({ isLive, currentQuestion, endTime: newEndTime }) => {
       setIsLive(isLive);
       setCurrentQuestion(currentQuestion);
+      setEndTime(newEndTime);
       if (isLive) {
         setLeaderboard([]);
         setAnsweringTeam(null);
@@ -38,6 +41,17 @@ export default function ProjectorApp() {
     return () => { socket.disconnect(); };
   }, []);
 
+  useEffect(() => {
+    if (isLive && endTime) {
+      const interval = setInterval(() => {
+        const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+        setTimeLeft(remaining);
+        if (remaining <= 0) clearInterval(interval);
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [isLive, endTime]);
+
   return (
     <div className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
       <div className="w-full max-w-6xl space-y-8">
@@ -51,13 +65,24 @@ export default function ProjectorApp() {
         {activeTab === 'home' && (
           <div className="space-y-8 animate-in fade-in zoom-in duration-500">
             {/* Question Banner */}
-            <div className={`w-full border-8 border-black box-shadow-brutal p-12 transition-all duration-500 ${isLive ? 'bg-[#3DDC84]' : 'bg-white'} ${answeringTeam ? 'scale-95 opacity-50' : 'scale-100'}`}>
+            <div className={`w-full border-8 border-black box-shadow-brutal p-12 transition-all duration-500 ${isLive ? 'bg-[#3DDC84]' : 'bg-white'} ${answeringTeam ? 'scale-95 opacity-50' : 'scale-100'} relative overflow-hidden`}>
+              {/* Countdown Progress Bar */}
+              {isLive && endTime && (
+                <div className="absolute bottom-0 left-0 h-4 bg-black transition-all duration-100" style={{ width: `${(timeLeft / 10) * 100}%` }}></div>
+              )}
               <h2 className="text-3xl font-black uppercase mb-4 opacity-50">Current Question</h2>
               <h1 className="text-6xl font-black leading-tight">
                 {currentQuestion ? currentQuestion.text : 'Waiting for Organizer...'}
               </h1>
-              <div className="mt-8 text-2xl font-bold uppercase tracking-widest bg-black text-white inline-block px-4 py-2">
-                Status: {isLive ? 'LIVE' : 'LOCKED'}
+              <div className="mt-8 flex items-center space-x-4">
+                <div className="text-2xl font-bold uppercase tracking-widest bg-black text-white inline-block px-4 py-2">
+                  Status: {isLive ? 'LIVE' : 'LOCKED'}
+                </div>
+                {isLive && (
+                  <div className="text-2xl font-black bg-white border-4 border-black px-4 py-1">
+                    {timeLeft}s
+                  </div>
+                )}
               </div>
             </div>
 

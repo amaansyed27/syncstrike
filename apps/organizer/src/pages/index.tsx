@@ -18,6 +18,8 @@ export default function OrganizerApp() {
   const [isLive, setIsLive] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [answeringTeam, setAnsweringTeam] = useState<LeaderboardEntry | null>(null);
+  const [endTime, setEndTime] = useState<number | undefined>(undefined);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
 
   // File upload states
   const [uploadMode, setUploadMode] = useState<'append' | 'replace'>('append');
@@ -47,8 +49,9 @@ export default function OrganizerApp() {
     const socket = io(BACKEND_URL);
     socket.emit('join_room', { role: 'organizer' });
 
-    socket.on('state_update', ({ isLive: newLive, currentQuestion: newQ }) => {
+    socket.on('state_update', ({ isLive: newLive, currentQuestion: newQ, endTime: newEndTime }) => {
       setIsLive(newLive);
+      setEndTime(newEndTime);
       if (newQ) setCurrentQuestion(newQ);
       if (newLive) {
         setLeaderboard([]);
@@ -66,6 +69,17 @@ export default function OrganizerApp() {
 
     return () => { socket.disconnect(); };
   }, [isAuth]);
+
+  useEffect(() => {
+    if (isLive && endTime) {
+      const interval = setInterval(() => {
+        const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+        setTimeLeft(remaining);
+        if (remaining <= 0) clearInterval(interval);
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [isLive, endTime]);
 
   const handleLogin = () => {
     if (passcode.length > 0) {
@@ -188,8 +202,15 @@ export default function OrganizerApp() {
       {activeTab === 'live' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-8">
-            <div className="bg-white border-8 border-black box-shadow-brutal p-8">
-              <h2 className="text-3xl font-black uppercase mb-4">Buzzer Control</h2>
+            <div className="bg-white border-8 border-black box-shadow-brutal p-8 relative overflow-hidden">
+              {/* Countdown Progress Bar */}
+              {isLive && endTime && (
+                <div className="absolute top-0 left-0 h-2 bg-[#3DDC84] transition-all duration-100" style={{ width: `${(timeLeft / 10) * 100}%` }}></div>
+              )}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-3xl font-black uppercase">Buzzer Control</h2>
+                {isLive && <span className="font-black text-xl">{timeLeft}s remaining</span>}
+              </div>
               <select className="w-full border-4 border-black p-4 text-xl font-bold uppercase cursor-pointer mb-8"
                 onChange={(e) => {
                   const q = questions.find(qu => qu.id === e.target.value);
@@ -202,7 +223,7 @@ export default function OrganizerApp() {
               </select>
 
               <div className="flex space-x-4">
-                <button disabled={!currentQuestion || isLive} onClick={() => toggleBuzzer(true)} className="flex-1 bg-[#3DDC84] border-4 border-black py-6 text-2xl font-black uppercase box-shadow-brutal active:translate-y-1 active:shadow-none disabled:opacity-50">Set Live</button>
+                <button disabled={!currentQuestion || isLive} onClick={() => toggleBuzzer(true)} className="flex-1 bg-[#3DDC84] border-4 border-black py-6 text-2xl font-black uppercase box-shadow-brutal active:translate-y-1 active:shadow-none disabled:opacity-50">Set Live (10s)</button>
                 <button disabled={!currentQuestion || !isLive} onClick={() => toggleBuzzer(false)} className="flex-1 bg-red-500 text-white border-4 border-black py-6 text-2xl font-black uppercase box-shadow-brutal active:translate-y-1 active:shadow-none disabled:opacity-50">Lock</button>
               </div>
             </div>
@@ -227,7 +248,7 @@ export default function OrganizerApp() {
                 <div className="space-y-2">
                   {leaderboard.map(lb => (
                     <div key={lb.teamCode} className={`flex justify-between items-center border-4 border-black p-4 font-bold uppercase ${lb.isWrong ? 'bg-red-100 line-through opacity-50' : 'bg-gray-100'}`}>
-                      <span>{lb.rank}. {lb.teamName}</span>
+                      <span>{lb.rank}. {lb.teamName} ({lb.teamCode})</span>
                       <span className="text-[#3DDC84] bg-black px-2">{lb.hitTime - leaderboard[0].hitTime}ms</span>
                     </div>
                   ))}

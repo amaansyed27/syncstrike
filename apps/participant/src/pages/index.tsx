@@ -10,6 +10,8 @@ export default function ParticipantApp() {
   const [isLive, setIsLive] = useState(false);
   const [lockedReason, setLockedReason] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
+  const [endTime, setEndTime] = useState<number | undefined>(undefined);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
 
@@ -28,9 +30,10 @@ export default function ParticipantApp() {
 
       socket.emit('join_room', { role: 'participant', teamCode });
 
-      socket.on('state_update', ({ isLive: newIsLive, currentQuestion: newQ }) => {
+      socket.on('state_update', ({ isLive: newIsLive, currentQuestion: newQ, endTime: newEndTime }) => {
         setIsLive(newIsLive);
         setCurrentQuestion(newQ);
+        setEndTime(newEndTime);
         if (newIsLive) setLockedReason(null);
       });
 
@@ -47,6 +50,17 @@ export default function ParticipantApp() {
       };
     }
   }, [joined, teamCode]);
+
+  useEffect(() => {
+    if (isLive && endTime) {
+      const interval = setInterval(() => {
+        const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+        setTimeLeft(remaining);
+        if (remaining <= 0) clearInterval(interval);
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [isLive, endTime]);
 
   const handleJoin = () => {
     if (teamCode.length > 0) {
@@ -100,7 +114,7 @@ export default function ParticipantApp() {
     btnText = lockedReason.includes('Spam') ? 'LOCKED (SPAM)' : lockedReason.includes('Already') ? 'BUZZED!' : 'LOCKED';
   } else if (isLive) {
     btnColor = 'bg-[#3DDC84]';
-    btnText = 'BUZZ!';
+    btnText = `BUZZ! (${timeLeft}s)`;
   }
 
   return (

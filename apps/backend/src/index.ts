@@ -184,7 +184,9 @@ app.post('/api/buzzer/toggle', async (req, res) => {
   const questionDoc = await db.collection('questions').doc(questionId).get();
   const currentQuestion = questionDoc.exists ? questionDoc.data() as Question : null;
 
-  io.emit('state_update', { isLive, currentQuestion });
+  const endTime = isLive ? Date.now() + 10000 : undefined; // 10 second countdown
+
+  io.emit('state_update', { isLive, currentQuestion, endTime });
 
   if (isLive) {
     await redis.del(`syncstrike:leaderboard:${questionId}`);
@@ -193,8 +195,17 @@ app.post('/api/buzzer/toggle', async (req, res) => {
     if (keys.length > 0) await redis.del(keys);
     io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
     io.to('projector').to('organizer').emit('answering_team', { team: null });
+
+    // Auto lock buzzer after 10 seconds
+    setTimeout(async () => {
+      const state = await redis.get(`buzzer_state:${questionId}`);
+      if (state === 'LIVE') {
+        await redis.set(`buzzer_state:${questionId}`, 'LOCKED');
+        io.emit('state_update', { isLive: false, currentQuestion, endTime: undefined });
+      }
+    }, 10000);
   }
-  res.json({ success: true, isLive });
+  res.json({ success: true, isLive, endTime });
 });
 
 app.post('/api/buzzer/correct', async (req, res) => {
