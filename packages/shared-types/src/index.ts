@@ -9,6 +9,8 @@ export interface Question {
   text: string;
   answer: string;
   isComplete: boolean;
+  winnerCode?: string;
+  winnerName?: string;
 }
 
 export interface BuzzEvent {
@@ -24,15 +26,23 @@ export interface LeaderboardEntry {
   isWrong: boolean;
 }
 
+export type BuzzerState = 'LOCKED' | 'LIVE' | 'JUDGING';
+export type ProjectorView = 'home' | 'reaction' | 'accuracy';
+
+export interface GameState {
+  buzzerState: BuzzerState;
+  activeQuestion: Question | null;
+  endTime?: number;
+  projectorView: ProjectorView;
+}
+
 // Server to client events
 export interface ServerToClientEvents {
-  question_active: (data: { question: Question }) => void;
-  question_completed: () => void;
+  state_update: (data: GameState) => void;
+  leaderboard_update: (data: { leaderboard: LeaderboardEntry[] }) => void;
+  answering_team: (data: { team: LeaderboardEntry | null }) => void;
   buzz_locked: (data: { reason: string }) => void;
   buzz_acknowledged: () => void;
-  leaderboard_update: (data: { leaderboard: LeaderboardEntry[] }) => void;
-  state_update: (data: { isLive: boolean; currentQuestion: Question | null; endTime?: number }) => void;
-  answering_team: (data: { team: LeaderboardEntry | null }) => void;
 }
 
 // Client to server events

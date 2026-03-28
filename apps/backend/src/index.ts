@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { redis, pubClient, subClient } from './redis';
 import { db } from './firebase';
-import { ServerToClientEvents, ClientToServerEvents, Question, Team, LeaderboardEntry } from '@syncstrike/shared-types';
+import { ServerToClientEvents, ClientToServerEvents, Question, Team, LeaderboardEntry, GameState, BuzzerState, ProjectorView } from '@syncstrike/shared-types';
 
 dotenv.config();
 
@@ -20,6 +20,26 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
 });
 
 io.adapter(createAdapter(pubClient, subClient));
+
+// Global State Management
+async function getGameState(): Promise<GameState> {
+  const stateStr = await redis.get('syncstrike:game_state');
+  if (!stateStr) {
+    const defaultState: GameState = { buzzerState: 'LOCKED', activeQuestion: null, projectorView: 'home' };
+    await redis.set('syncstrike:game_state', JSON.stringify(defaultState));
+    return defaultState;
+  }
+  return JSON.parse(stateStr);
+}
+
+async function updateGameState(updates: Partial<GameState>): Promise<GameState> {
+  const currentState = await getGameState();
+  const newState = { ...currentState, ...updates };
+  if (updates.buzzerState === 'LOCKED') delete newState.endTime;
+  await redis.set('syncstrike:game_state', JSON.stringify(newState));
+  io.emit('state_update', newState);
+  return newState;
+}
 
 async function getTeamName(teamCode: string): Promise<string> {
   const cached = await redis.get(`team_name:${teamCode}`);
@@ -62,6 +82,27 @@ async function broadcastLeaderboard(questionId: string) {
   io.to('projector').to('organizer').emit('answering_team', { team: answeringTeam });
 }
 
+// === AUTH & PUBLIC ENDPOINTS ===
+
+app.post('/api/verify-passcode', (req, res) => {
+  if (req.headers.authorization === process.env.ADMIN_PASS) {
+    return res.json({ success: true });
+  }
+  res.status(401).json({ error: 'Unauthorized' });
+});
+
+app.post('/api/verify-team', async (req, res) => {
+  const { teamCode } = req.body;
+  if (!teamCode) return res.status(400).json({ error: 'Missing teamCode' });
+  const code = teamCode.toUpperCase();
+  const doc = await db.collection('teams').doc(code).get();
+  if (doc.exists) {
+    return res.json({ success: true, team: doc.data() });
+  }
+  res.status(404).json({ error: 'Team not found' });
+});
+
+// === ADMIN MIDDLEWARE ===
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (req.headers.authorization !== process.env.ADMIN_PASS) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -71,16 +112,18 @@ const authMiddleware = (req: express.Request, res: express.Response, next: expre
 
 app.use('/api', authMiddleware);
 
+// === CRUD & DB ACTIONS ===
+
 app.post('/api/db/clear', async (req, res) => {
   try {
-    const collections = ['teams', 'questions'];
-    for (const coll of collections) {
+    for (const coll of ['teams', 'questions']) {
       const snap = await db.collection(coll).get();
       const batch = db.batch();
       snap.docs.forEach(doc => batch.delete(doc.ref));
       await batch.commit();
     }
     await redis.flushdb();
+    await updateGameState({ buzzerState: 'LOCKED', activeQuestion: null, projectorView: 'home' });
     res.json({ success: true, message: 'Database wiped.' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to clear db' });
@@ -97,7 +140,6 @@ app.post('/api/mock-data', async (req, res) => {
     const existingQs = await questionsRef.get();
     existingQs.forEach((doc) => doc.ref.delete());
 
-    // Generate 50 dummy teams
     const teams = Array.from({ length: 50 }).map((_, i) => ({
       code: `T${String(i + 1).padStart(3, '0')}`,
       name: `Mock Team ${i + 1}`,
@@ -112,6 +154,9 @@ app.post('/api/mock-data', async (req, res) => {
       isComplete: false
     }));
     for (const q of questions) await questionsRef.doc(q.id).set(q);
+
+    await redis.flushdb();
+    await updateGameState({ buzzerState: 'LOCKED', activeQuestion: null, projectorView: 'home' });
 
     res.json({ success: true, message: 'Mock data loaded' });
   } catch (error) {
@@ -146,28 +191,22 @@ app.delete('/api/questions/:id', async (req, res) => {
 app.post('/api/bulk', async (req, res) => {
   const { type, mode, data } = req.body;
   try {
-    const collectionName = type === 'teams' ? 'teams' : 'questions';
+    const coll = type === 'teams' ? 'teams' : 'questions';
     if (mode === 'replace') {
-      const snap = await db.collection(collectionName).get();
+      const snap = await db.collection(coll).get();
       const batch = db.batch();
       snap.docs.forEach(doc => batch.delete(doc.ref));
       await batch.commit();
     }
 
     const batch = db.batch();
-    if (type === 'teams') {
-      data.forEach((t: any) => {
-        if (t.code && t.name) {
-          batch.set(db.collection('teams').doc(t.code.toUpperCase()), { code: t.code.toUpperCase(), name: t.name, totalScore: 0 }, { merge: true });
-        }
-      });
-    } else {
-      data.forEach((q: any) => {
-        if (q.id && q.text) {
-          batch.set(db.collection('questions').doc(q.id), { id: q.id, text: q.text, answer: q.answer || '', isComplete: false }, { merge: true });
-        }
-      });
-    }
+    data.forEach((item: any) => {
+      if (type === 'teams' && item.code && item.name) {
+        batch.set(db.collection('teams').doc(item.code.toUpperCase()), { code: item.code.toUpperCase(), name: item.name, totalScore: 0 }, { merge: true });
+      } else if (type === 'questions' && item.id && item.text) {
+        batch.set(db.collection('questions').doc(item.id), { id: item.id, text: item.text, answer: item.answer || '', isComplete: false }, { merge: true });
+      }
+    });
     await batch.commit();
     res.json({ success: true });
   } catch (err) {
@@ -175,51 +214,114 @@ app.post('/api/bulk', async (req, res) => {
   }
 });
 
-app.post('/api/buzzer/toggle', async (req, res) => {
-  const { questionId, isLive } = req.body;
-  if (!questionId) return res.status(400).json({ error: 'Missing questionId' });
+// === PROJECTOR VIEW ===
+app.post('/api/projector/view', async (req, res) => {
+  const { view } = req.body;
+  await updateGameState({ projectorView: view });
+  res.json({ success: true });
+});
 
-  await redis.set(`buzzer_state:${questionId}`, isLive ? 'LIVE' : 'LOCKED');
-  const questionDoc = await db.collection('questions').doc(questionId).get();
-  const currentQuestion = questionDoc.exists ? questionDoc.data() as Question : null;
+// === GAME ENGINE ===
+let currentTimer: NodeJS.Timeout | null = null;
 
-  const endTime = isLive ? Date.now() + 10000 : undefined; // 10 second countdown
+app.post('/api/buzzer/start', async (req, res) => {
+  const state = await getGameState();
+  let question = state.activeQuestion;
 
-  io.emit('state_update', { isLive, currentQuestion, endTime });
-
-  if (isLive) {
-    await redis.del(`syncstrike:leaderboard:${questionId}`);
-    await redis.del(`syncstrike:wrong:${questionId}`);
-    const keys = await redis.keys(`syncstrike:spam:${questionId}:*`);
-    if (keys.length > 0) await redis.del(keys);
-    io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
-    io.to('projector').to('organizer').emit('answering_team', { team: null });
-
-    // Auto lock buzzer after 10 seconds
-    setTimeout(async () => {
-      const state = await redis.get(`buzzer_state:${questionId}`);
-      if (state === 'LIVE') {
-        await redis.set(`buzzer_state:${questionId}`, 'LOCKED');
-        io.emit('state_update', { isLive: false, currentQuestion, endTime: undefined });
-      }
-    }, 10000);
+  if (!question) {
+    const qSnap = await db.collection('questions').where('isComplete', '==', false).get();
+    if (qSnap.empty) return res.status(400).json({ error: 'No uncompleted questions found!' });
+    const qs = qSnap.docs.map(d => ({ ...d.data(), id: d.id }) as Question);
+    question = qs[Math.floor(Math.random() * qs.length)];
   }
-  res.json({ success: true, isLive, endTime });
+
+  const qId = question.id;
+  await redis.del(`syncstrike:leaderboard:${qId}`);
+  await redis.del(`syncstrike:wrong:${qId}`);
+  const keys = await redis.keys(`syncstrike:spam:${qId}:*`);
+  if (keys.length > 0) await redis.del(keys);
+  
+  io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
+  io.to('projector').to('organizer').emit('answering_team', { team: null });
+
+  const endTime = Date.now() + 10000;
+  await updateGameState({ buzzerState: 'LIVE', activeQuestion: question, endTime, projectorView: 'home' });
+
+  if (currentTimer) clearTimeout(currentTimer);
+  currentTimer = setTimeout(async () => {
+    const s = await getGameState();
+    if (s.buzzerState === 'LIVE') {
+      await updateGameState({ buzzerState: 'JUDGING' });
+    }
+  }, 10000);
+
+  res.json({ success: true, question });
+});
+
+app.post('/api/buzzer/reopen', async (req, res) => {
+  const state = await getGameState();
+  if (!state.activeQuestion) return res.status(400).json({ error: 'No active question' });
+  const qId = state.activeQuestion.id;
+  
+  await redis.del(`syncstrike:leaderboard:${qId}`);
+  await redis.del(`syncstrike:wrong:${qId}`);
+  io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
+  io.to('projector').to('organizer').emit('answering_team', { team: null });
+
+  const endTime = Date.now() + 10000;
+  await updateGameState({ buzzerState: 'LIVE', endTime, projectorView: 'home' });
+
+  if (currentTimer) clearTimeout(currentTimer);
+  currentTimer = setTimeout(async () => {
+    const s = await getGameState();
+    if (s.buzzerState === 'LIVE') {
+      await updateGameState({ buzzerState: 'JUDGING' });
+    }
+  }, 10000);
+
+  res.json({ success: true });
+});
+
+app.post('/api/buzzer/stop', async (req, res) => {
+  if (currentTimer) clearTimeout(currentTimer);
+  await updateGameState({ buzzerState: 'JUDGING' });
+  res.json({ success: true });
+});
+
+app.post('/api/buzzer/skip', async (req, res) => {
+  if (currentTimer) clearTimeout(currentTimer);
+  await updateGameState({ buzzerState: 'LOCKED', activeQuestion: null });
+  io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
+  io.to('projector').to('organizer').emit('answering_team', { team: null });
+  res.json({ success: true });
 });
 
 app.post('/api/buzzer/correct', async (req, res) => {
-  const { teamCode, questionId } = req.body;
+  const state = await getGameState();
+  const qId = state.activeQuestion?.id;
+  const { teamCode, teamName } = req.body;
+  if (!qId || !teamCode) return res.status(400).json({ error: 'Missing data' });
+
   try {
     const teamRef = db.collection('teams').doc(teamCode);
     await db.runTransaction(async (t) => {
       const doc = await t.get(teamRef);
       if (doc.exists) {
-        const newScore = (doc.data()?.totalScore || 0) + 1;
-        t.update(teamRef, { totalScore: newScore });
+        t.update(teamRef, { totalScore: (doc.data()?.totalScore || 0) + 1 });
       }
     });
-    await redis.set(`buzzer_state:${questionId}`, 'LOCKED');
-    io.emit('state_update', { isLive: false, currentQuestion: null });
+
+    await db.collection('questions').doc(qId).update({ 
+      isComplete: true, 
+      winnerCode: teamCode,
+      winnerName: teamName || teamCode
+    });
+
+    if (currentTimer) clearTimeout(currentTimer);
+    await updateGameState({ buzzerState: 'LOCKED', activeQuestion: null });
+    io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
+    io.to('projector').to('organizer').emit('answering_team', { team: null });
+    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to award point' });
@@ -227,18 +329,29 @@ app.post('/api/buzzer/correct', async (req, res) => {
 });
 
 app.post('/api/buzzer/wrong', async (req, res) => {
-  const { teamCode, questionId } = req.body;
+  const state = await getGameState();
+  const qId = state.activeQuestion?.id;
+  const { teamCode } = req.body;
+  if (!qId || !teamCode) return res.status(400).json({ error: 'Missing data' });
+
   try {
-    await redis.sadd(`syncstrike:wrong:${questionId}`, teamCode);
-    await broadcastLeaderboard(questionId);
+    await redis.sadd(`syncstrike:wrong:${qId}`, teamCode);
+    await broadcastLeaderboard(qId);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to mark wrong' });
   }
 });
 
-io.on('connection', (socket) => {
-  socket.on('join_room', ({ role, teamCode }: { role: 'participant'|'projector'|'organizer', teamCode?: string }) => {
+// === WEBSOCKETS ===
+io.on('connection', async (socket) => {
+  const state = await getGameState();
+  socket.emit('state_update', state);
+  if (state.activeQuestion) {
+    await broadcastLeaderboard(state.activeQuestion.id);
+  }
+
+  socket.on('join_room', ({ role, teamCode }) => {
     if (role === 'participant' && teamCode) {
       socket.join(`team_${teamCode}`);
     } else {
@@ -246,20 +359,21 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('buzz', async ({ teamCode, questionId }: { teamCode: string, questionId: string }) => {
+  socket.on('buzz', async ({ teamCode, questionId }) => {
     const hitTime = Date.now();
+    const state = await getGameState();
+    
+    if (state.buzzerState !== 'LIVE' || state.activeQuestion?.id !== questionId) {
+      socket.emit('buzz_locked', { reason: 'Buzzer is not active.' });
+      return;
+    }
+
     const spamKey = `syncstrike:spam:${questionId}:${teamCode}`;
     const result = await redis.pipeline().incr(spamKey).expire(spamKey, 3600).exec();
     const clicks = result?.[0][1] as number;
 
     if (clicks > 3) {
       socket.emit('buzz_locked', { reason: 'Spam detected. Locked for this round.' });
-      return;
-    }
-
-    const state = await redis.get(`buzzer_state:${questionId}`);
-    if (state !== 'LIVE') {
-      socket.emit('buzz_locked', { reason: 'Buzzer is not live.' });
       return;
     }
 
@@ -277,5 +391,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-  console.log(`SyncStrike Backend running on port ${PORT}`);
+  console.log(`SyncStrike V3 Backend running on port ${PORT}`);
 });
