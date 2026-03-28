@@ -1,3 +1,4 @@
+import * as admin from 'firebase-admin';
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -403,4 +404,36 @@ io.on('connection', async (socket) => {
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`SyncStrike V3 Backend running on port ${PORT}`);
+});
+
+app.post('/api/db/reset-game', async (req, res) => {
+  try {
+    // Reset all team scores to 0
+    const teamsSnap = await db.collection('teams').get();
+    const teamBatch = db.batch();
+    teamsSnap.docs.forEach(doc => {
+      teamBatch.update(doc.ref, { totalScore: 0 });
+    });
+    await teamBatch.commit();
+
+    // Reset all questions to uncompleted
+    const qsSnap = await db.collection('questions').get();
+    const qsBatch = db.batch();
+    qsSnap.docs.forEach(doc => {
+      qsBatch.update(doc.ref, { 
+        isComplete: false,
+        winnerCode: admin.firestore.FieldValue.delete(),
+        winnerName: admin.firestore.FieldValue.delete()
+      });
+    });
+    await qsBatch.commit();
+
+    // Clear Redis State
+    await redis.flushdb();
+    await updateGameState({ buzzerState: 'LOCKED', activeQuestion: null, projectorView: 'home' });
+
+    res.json({ success: true, message: 'Game reset successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset game' });
+  }
 });

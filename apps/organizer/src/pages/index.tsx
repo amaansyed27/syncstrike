@@ -21,6 +21,7 @@ export default function OrganizerApp() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
   const [uploadMode, setUploadMode] = useState<'append' | 'replace'>('append');
+  const [showRemote, setShowRemote] = useState(false);
 
   const verifyAuth = async (pass: string) => {
     try {
@@ -174,13 +175,32 @@ export default function OrganizerApp() {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans pb-12">
+      
+      {/* Remote Control Expander (Hover to open) */}
+      <div 
+        className="fixed top-[100px] right-0 z-50 transition-transform duration-300 transform translate-x-[280px] hover:translate-x-0"
+      >
+        <div className="flex items-center">
+          <div className="bg-black text-white px-2 py-4 border-y-4 border-l-4 border-black font-bold uppercase" style={{ writingMode: 'vertical-rl' }}>
+            Remote Control
+          </div>
+          <div className="bg-white border-4 border-black shadow-[-8px_8px_0px_0px_#000] p-4 w-[280px] space-y-4">
+            <h3 className="font-black uppercase text-center border-b-2 border-black pb-2">Projector Screen</h3>
+            <button onClick={() => setProjectorView('home')} className={`w-full border-2 border-black py-2 font-bold uppercase transition-all shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none ${gameState?.projectorView === 'home' ? 'bg-[#3DDC84]' : 'bg-gray-100 hover:bg-gray-200'}`}>1. Spotlight (Live)</button>
+            <button onClick={() => setProjectorView('reaction')} className={`w-full border-2 border-black py-2 font-bold uppercase transition-all shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none ${gameState?.projectorView === 'reaction' ? 'bg-[#3DDC84]' : 'bg-gray-100 hover:bg-gray-200'}`}>2. Reaction Queue</button>
+            <button onClick={() => setProjectorView('accuracy')} className={`w-full border-2 border-black py-2 font-bold uppercase transition-all shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none ${gameState?.projectorView === 'accuracy' ? 'bg-[#3DDC84]' : 'bg-gray-100 hover:bg-gray-200'}`}>3. Total Scoreboard</button>
+          </div>
+        </div>
+      </div>
+
       {/* Sticky Top Navbar */}
-      <div className="sticky top-0 z-50 bg-white border-b-4 border-black shadow-[0px_4px_0px_0px_#000] p-4 px-8 flex flex-col md:flex-row justify-between items-center mb-8 gap-4 md:gap-0">
+      <div className="sticky top-0 z-40 bg-white border-b-4 border-black sh
+adow-[0px_4px_0px_0px_#000] p-4 px-8 flex flex-col md:flex-row justify-between items-center mb-8 gap-4 md:gap-0">
         <h1 className="text-2xl font-black uppercase tracking-tighter">SyncStrike</h1>
         <div className="flex flex-wrap justify-center gap-2">
           {['home', 'leaderboards', 'teams', 'questions', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 font-bold border-2 border-black uppercase text-sm shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all ${activeTab === tab ? 'bg-black text-[#3DDC84]' : 'bg-white hover:bg-gray-100'}`}>
-              {tab}
+              {tab === 'leaderboards' ? 'Scoreboard' : tab}
             </button>
           ))}
           <button onClick={handleLogout} className="ml-2 px-4 py-2 bg-red-500 text-white font-bold border-2 border-black uppercase text-sm shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">Sign Out</button>
@@ -197,8 +217,7 @@ export default function OrganizerApp() {
               )}
               <div className="flex justify-between items-center mb-4 border-b-4 border-black pb-4">
                 <h2 className="text-2xl font-black uppercase">Live Control</h2>
-                <div className={`px-4 py-1 text-sm font-bold uppercase bo
-rder-2 border-black text-white ${gameState?.buzzerState === 'LIVE' ? 'bg-black' : gameState?.buzzerState === 'JUDGING' ? 'bg-yellow-500' : 'bg-red-500'}`}>
+                <div className={`px-4 py-1 text-sm font-bold uppercase border-2 border-black text-white ${gameState?.buzzerState === 'LIVE' ? 'bg-black' : gameState?.buzzerState === 'JUDGING' ? 'bg-yellow-500' : 'bg-red-500'}`}>
                   {gameState?.buzzerState} {gameState?.buzzerState === 'LIVE' ? `(${timeLeft}s)` : ''}
                 </div>
               </div>
@@ -244,7 +263,7 @@ rder-2 border-black text-white ${gameState?.buzzerState === 'LIVE' ? 'bg-black' 
 
             {/* Judging Panel */}
             <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000] p-6 h-[500px] flex flex-col">
-              <h2 className="text-2xl font-black uppercase mb-4 border-b-4 border-black pb-4">Judging Queue</h2>
+              <h2 className="text-2xl font-black uppercase mb-4 border-b-4 border-black pb-4">Judging Desk</h2>
               
               {gameState?.buzzerState === 'JUDGING' && answeringTeam ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in">
@@ -278,12 +297,21 @@ rder-2 border-black text-white ${gameState?.buzzerState === 'LIVE' ? 'bg-black' 
 
         {/* LEADERBOARDS TAB */}
         {activeTab === 'leaderboards' && (
-          <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000] p-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl font-black uppercase mb-6 border-b-4 border-black pb-4">Projector Screen Control</h2>
-            <div className="space-y-4">
-              <button onClick={() => setProjectorView('home')} className={`w-full border-4 border-black py-4 font-black uppercase text-xl transition-all shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none ${gameState?.projectorView === 'home' ? 'bg-black text-[#3DDC84]' : 'bg-gray-100 hover:bg-gray-200'}`}>1. Show Home (Spotlight)</button>
-              <button onClick={() => setProjectorView('reaction')} className={`w-full border-4 border-black py-4 font-black uppercase text-xl transition-all shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none ${gameState?.projectorView === 'reaction' ? 'bg-black text-[#3DDC84]' : 'bg-gray-100 hover:bg-gray-200'}`}>2. Show Reaction Queue</button>
-              <button onClick={() => setProjectorView('accuracy')} className={`w-full border-4 border-black py-4 font-black uppercase text-xl transition-all shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none ${gameState?.projectorView === 'accuracy' ? 'bg-black text-[#3DDC84]' : 'bg-gray-100 hover:bg-gray-200'}`}>3. Show Total Accuracy</button>
+          <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000] p-6 max-w-4xl mx-auto">
+            <h2 className="text-3xl font-black uppercase mb-6 border-b-4 border-black pb-4">Accuracy Scoreboard</h2>
+            <div className="space-y-3">
+              {[...teams].sort((a,b) => b.totalScore - a.totalScore).map((t, idx) => (
+                <div key={t.code} className="flex justify-between items-center text-xl font-bold border-4 border-black p-4 uppercase bg-gray-50 shadow-[4px_4px_0px_0px_#000]">
+                  <div className="flex items-center">
+         
+           <span className="opacity-50 mr-4">#{idx + 1}</span>
+                    <span>{t.name}</span>
+                  </div>
+                  <span className="border-2 border-black px-4 py-1 bg-[#3DDC84] text-black">
+                    {t.totalScore}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -301,8 +329,7 @@ rder-2 border-black text-white ${gameState?.buzzerState === 'LIVE' ? 'bg-black' 
                </select>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-         
-      {teams.map(t => (
+               {teams.map(t => (
                  <div key={t.code} className="flex justify-between items-center border-2 border-black p-4 bg-gray-50 shadow-[2px_2px_0px_0px_#000]">
                     <div>
                        <div className="font-black uppercase">{t.name}</div>
@@ -345,18 +372,28 @@ rder-2 border-black text-white ${gameState?.buzzerState === 'LIVE' ? 'bg-black' 
         {/* SETTINGS */}
         {activeTab === 'settings' && (
           <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000] p-6 max-w-2xl mx-auto space-y-8">
+            
+            <div>
+              <h2 className="text-2xl font-black uppercase mb-4 border-b-4 border-black pb-4">Game Management</h2>
+              <button onClick={async () => { if(confirm('This resets all team points to 0 and reopens all questions. Keep existing teams and questions?')) { await apiCall('/api/db/reset-game', 'POST'); fetchData(); alert('Game Reset!'); } }} className="w-full bg-yellow-400 text-black border-4 border-black py-4 font-black uppercase shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">
+                Reset Game (Scores & Questions)
+              </button>
+            </div>
+
             <div>
               <h2 className="text-2xl font-black uppercase mb-4 border-b-4 border-black pb-4">Mock Data</h2>
-              <button onClick={async () => { if(confirm('Wipe and Load?')) { await apiCall('/api/mock-data', 'POST'); fetchData(); } }} className="w-full bg-black text-white border-4 border-black py-4 font-black uppercase shadow-[4px_4px_0px_0px_#000] hover:bg-gray-800 active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">
+              <button onClick={async () => { if(confirm('Wipe and Load Mock Data?')) { await apiCall('/api/mock-data', 'POST'); fetchData(); } }} className="w-full bg-black text-white border-4 border-black py-4 font-black uppercase shadow-[4px_4px_0px_0px_#000] hover:bg-gray-800 active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">
                 Load Mock Data
               </button>
             </div>
+
             <div>
               <h2 className="text-2xl font-black uppercase text-red-500 mb-4 border-b-4 border-red-500 pb-4">Danger Zone</h2>
-              <button onClick={async () => { if(confirm('DELETE EVERYTHING?')) { await apiCall('/api/db/clear', 'POST'); fetchData(); } }} className="w-full bg-red-500 text-white border-4 border-black py-4 font-black uppercase shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">
+              <button onClick={async () => { if(confirm('DELETE EVERYTHING? (Teams & Questions)')) { await apiCall('/api/db/clear', 'POST'); fetchData(); } }} className="w-full bg-red-500 text-white border-4 border-black py-4 font-black uppercase shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">
                 Clear Entire Database
               </button>
             </div>
+
           </div>
         )}
       </div>
