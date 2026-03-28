@@ -1,0 +1,21 @@
+{
+  "projects": {
+    "default": "syncstrike-prod"
+  },
+  "targets": {
+    "syncstrike-prod": {
+      "hosting": {
+        "participant": [
+          "syncstrike-prod"
+        ],
+        "projector": [
+          "syncstrike-prod-projector"
+        ],
+        "organizer": [
+          "syncstrike-prod-organizer"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
