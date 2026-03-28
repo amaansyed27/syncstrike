@@ -97,13 +97,12 @@ app.post('/api/mock-data', async (req, res) => {
     const existingQs = await questionsRef.get();
     existingQs.forEach((doc) => doc.ref.delete());
 
-    const teams = [
-      { code: 'ALPHA', name: 'Alpha Squad', totalScore: 0 },
-      { code: 'BRAVO', name: 'Bravo Battalion', totalScore: 0 },
-      { code: 'CHARL', name: 'Charlie Co', totalScore: 0 },
-      { code: 'DELTA', name: 'Delta Force', totalScore: 0 },
-      { code: 'ECHOX', name: 'Echo Elements', totalScore: 0 },
-    ];
+    // Generate 50 dummy teams
+    const teams = Array.from({ length: 50 }).map((_, i) => ({
+      code: `T${String(i + 1).padStart(3, '0')}`,
+      name: `Mock Team ${i + 1}`,
+      totalScore: 0
+    }));
     for (const team of teams) await teamsRef.doc(team.code).set(team);
 
     const questions = Array.from({ length: 10 }).map((_, i) => ({
