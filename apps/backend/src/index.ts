@@ -35,7 +35,9 @@ async function getGameState(): Promise<GameState> {
 async function updateGameState(updates: Partial<GameState>): Promise<GameState> {
   const currentState = await getGameState();
   const newState = { ...currentState, ...updates };
-  if (updates.buzzerState === 'LOCKED') delete newState.endTime;
+  if (updates.buzzerState && updates.buzzerState !== 'LIVE') {
+    delete newState.endTime;
+  }
   await redis.set('syncstrike:game_state', JSON.stringify(newState));
   io.emit('state_update', newState);
   return newState;
@@ -100,6 +102,12 @@ app.post('/api/verify-team', async (req, res) => {
     return res.json({ success: true, team: doc.data() });
   }
   res.status(404).json({ error: 'Team not found' });
+});
+
+app.get('/api/public/teams', async (req, res) => {
+  const snap = await db.collection('teams').get();
+  const teams = snap.docs.map(d => d.data());
+  res.json({ success: true, teams });
 });
 
 // === ADMIN MIDDLEWARE ===
@@ -226,11 +234,13 @@ let currentTimer: NodeJS.Timeout | null = null;
 
 app.post('/api/buzzer/start', async (req, res) => {
   const state = await getGameState();
-  let question = state.activeQuestion;
+  let question 
+= state.activeQuestion;
 
   if (!question) {
+    // Fetch a random uncompleted question
     const qSnap = await db.collection('questions').where('isComplete', '==', false).get();
-    if (qSnap.empty) return res.status(400).json({ error: 'No uncompleted questions found!' });
+    if (qSnap.empty) return res.status(400).json({ error: 'No uncompleted questions left!' });
     const qs = qSnap.docs.map(d => ({ ...d.data(), id: d.id }) as Question);
     question = qs[Math.floor(Math.random() * qs.length)];
   }
@@ -363,6 +373,7 @@ io.on('connection', async (socket) => {
     const hitTime = Date.now();
     const state = await getGameState();
     
+    // Only accept buzzes if LIVE and question matches
     if (state.buzzerState !== 'LIVE' || state.activeQuestion?.id !== questionId) {
       socket.emit('buzz_locked', { reason: 'Buzzer is not active.' });
       return;
