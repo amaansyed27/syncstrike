@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import Lottie from 'lottie-react';
 import { ClientToServerEvents, ServerToClientEvents, LeaderboardEntry, GameState, Team } from '@syncstrike/shared-types';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
@@ -11,6 +12,7 @@ export default function ProjectorApp() {
   const [teamScores, setTeamScores] = useState<Team[]>([]);
   const [isSocketConnected, setIsSocketConnected] = useState<boolean>(false);
   const [connectionStatus, setConnectionStatus] = useState<string>('Connecting...');
+  const [androidLottie, setAndroidLottie] = useState<object | null>(null);
 
   const fetchTeamScores = async () => {
     try {
@@ -98,6 +100,22 @@ export default function ProjectorApp() {
     return () => clearInterval(interval);
   }, [gameState?.projectorView]);
 
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/assets/lottie/android-logo.json')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted) setAndroidLottie(data);
+      })
+      .catch(() => {
+        // Non-blocking brand animation.
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   if (!gameState) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -113,6 +131,21 @@ export default function ProjectorApp() {
           {connectionStatus}
         </div>
       )}
+      <div className="w-full max-w-6xl border-4 border-black bg-white shadow-[6px_6px_0px_0px_#000] px-5 py-3 mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img
+            src="/assets/svg-static/pixel-android.svg"
+            alt="Android Club Icon"
+            className="w-8 h-8 object-contain"
+          />
+          <p className="font-black uppercase tracking-wider">Android Club • GeekRush • SyncStrike</p>
+        </div>
+        {androidLottie && (
+          <div className="w-14 h-14 border-2 border-black bg-white">
+            <Lottie animationData={androidLottie} loop autoplay />
+          </div>
+        )}
+      </div>
       <div className="w-full max-w-6xl space-y-8">
         
         {gameState.projectorView === 'home' && (
@@ -139,7 +172,14 @@ export default function ProjectorApp() {
               </div>
 
               <div className="w-full border-8 border-black bg-white shadow-[12px_12px_0px_0px_#000] p-6">
-                <h3 className="text-2xl font-black uppercase mb-4 border-b-4 border-black pb-2">Live Queue</h3>
+                <h3 className="text-2xl font-black uppercase mb-4 border-b-4 border-black pb-2 flex items-center gap-2">
+                  <img
+                    src="/assets/svg-static/pixel-android.svg"
+                    alt="Android Club Icon"
+                    className="w-7 h-7 object-contain"
+                  />
+                  Live Queue
+                </h3>
                 {leaderboard.length > 0 ? (
                   <div className="space-y-2">
                     {leaderboard.slice(0, 5).map((entry, idx) => (

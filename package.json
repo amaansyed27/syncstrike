@@ -7,8 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspaces",
+    "dev": "concurrently -n participant,projector,organizer -c cyan,magenta,green \"npm run dev --workspace=participant\" \"npm run dev --workspace=projector\" \"npm run dev --workspace=organizer\"",
+    "dev:full": "concurrently -n backend,participant,projector,organizer -c yellow,cyan,magenta,green \"npm run dev --workspace=backend\" \"npm run dev --workspace=participant\" \"npm run dev --workspace=projector\" \"npm run dev --workspace=organizer\"",
     "build": "npm run build --workspaces",
     "start": "npm run start --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

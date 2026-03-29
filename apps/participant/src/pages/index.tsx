@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import Lottie from 'lottie-react';
 import { ClientToServerEvents, ServerToClientEvents, GameState, LeaderboardEntry, Team } from '@syncstrike/shared-types';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
@@ -19,6 +20,7 @@ export default function ParticipantApp() {
   const [activeTab, setActiveTab] = useState<'buzzer' | 'reaction' | 'accuracy'>('buzzer');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [androidLottie, setAndroidLottie] = useState<object | null>(null);
 
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
 
@@ -65,6 +67,22 @@ export default function ParticipantApp() {
       setTeamCode(savedCode);
       verifyTeam(savedCode);
     }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/assets/lottie/android-logo.json')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted) setAndroidLottie(data);
+      })
+      .catch(() => {
+        // Non-blocking brand animation.
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -146,7 +164,20 @@ export default function ParticipantApp() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
         <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000] p-8 max-w-sm w-full space-y-6">
-          <h1 className="text-4xl font-black uppercase text-center">Join Game</h1>
+          <div className="flex items-center justify-center gap-3">
+            <img
+              src="/assets/svg-static/pixel-android.svg"
+              alt="Android Club Icon"
+              className="w-10 h-10 object-contain"
+            />
+            <h1 className="text-4xl font-black uppercase text-center">Join Game</h1>
+          </div>
+          <p className="text-center text-xs font-bold uppercase tracking-widest opacity-60">Android Club • GeekRush</p>
+          {androidLottie && (
+            <div className="w-28 h-28 mx-auto border-2 border-black bg-white">
+              <Lottie animationData={androidLottie} loop autoplay />
+            </div>
+          )}
           {error && <p className="text-red-500 font-bold text-center border-2 border-red-500 p-2">{error}</p>}
           <input
             type="text"
@@ -162,6 +193,11 @@ export default function ParticipantApp() {
           >
             Enter
           </button>
+          <img
+            src="/assets/svg-animated/syncstrike-andy-button.svg"
+            alt="SyncStrike Andy"
+            className="w-full h-28 object-contain border-2 border-black bg-white"
+          />
         </div>
       </div>
     );
@@ -188,9 +224,16 @@ export default function ParticipantApp() {
       
       {/* Persistent Top Bar */}
       <div className="w-full max-w-2xl bg-white border-b-4 border-black shadow-[0px_4px_0px_0px_#000] p-4 flex justify-between items-center z-50 sticky top-0">
-        <div>
-          <div className="font-black text-xl uppercase leading-none">{teamName}</div>
-          <div className="font-bold opacity-50 text-sm">CODE: {teamCode}</div>
+        <div className="flex items-center gap-2">
+          <img
+            src="/assets/svg-static/pixel-android.svg"
+            alt="Android Club Icon"
+            className="w-8 h-8 object-contain"
+          />
+          <div>
+            <div className="font-black text-xl uppercase leading-none">{teamName}</div>
+            <div className="font-bold opacity-50 text-sm">CODE: {teamCode}</div>
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           <div className="font-black text-xl bg-black text-[#3DDC84] px-3 py-1 border-2 border-black">
@@ -216,8 +259,7 @@ export default function ParticipantApp() {
         {activeTab === 'buzzer' && (
           <div className="flex-1 flex flex-col items-center justify-center w-full mt-8">
             {gameState?.activeQuestion && (
-              <div className="tex
-t-center w-full px-6 py-4 bg-white border-4 border-black shadow-[6px_6px_0px_0px_#000] mb-12">
+              <div className="text-center w-full px-6 py-4 bg-white border-4 border-black shadow-[6px_6px_0px_0px_#000] mb-12">
                 <p className="text-2xl font-bold">{gameState.activeQuestion.text}</p>
               </div>
             )}

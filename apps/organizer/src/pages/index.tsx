@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { Question, Team, LeaderboardEntry, GameState } from '@syncstrike/shared-types';
 import { io, Socket } from 'socket.io-client';
 import Papa from 'papaparse';
+import Lottie from 'lottie-react';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 
@@ -22,6 +23,7 @@ export default function OrganizerApp() {
 
   const [uploadMode, setUploadMode] = useState<'append' | 'replace'>('append');
   const [showRemote, setShowRemote] = useState(false);
+  const [androidLottie, setAndroidLottie] = useState<object | null>(null);
 
   const verifyAuth = async (pass: string) => {
     try {
@@ -44,6 +46,22 @@ export default function OrganizerApp() {
   useEffect(() => {
     const savedPass = localStorage.getItem('admin_pass');
     if (savedPass) verifyAuth(savedPass);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/assets/lottie/android-logo.json')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted) setAndroidLottie(data);
+      })
+      .catch(() => {
+        // Non-blocking brand animation.
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const fetchData = async () => {
@@ -161,13 +179,31 @@ export default function OrganizerApp() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
         <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000] p-8 space-y-4 max-w-sm w-full">
-          <h1 className="text-3xl font-black uppercase text-center">Organizer Login</h1>
+          <div className="flex items-center justify-center gap-3">
+            <img
+              src="/assets/svg-static/pixel-android.svg"
+              alt="Android Club Icon"
+              className="w-9 h-9 object-contain"
+            />
+            <h1 className="text-3xl font-black uppercase text-center">Organizer Login</h1>
+          </div>
+          <p className="text-center text-xs font-bold uppercase tracking-widest opacity-60">Android Club • GeekRush</p>
+          {androidLottie && (
+            <div className="w-24 h-24 mx-auto border-2 border-black bg-white">
+              <Lottie animationData={androidLottie} loop autoplay />
+            </div>
+          )}
           <input type="password"
             className="w-full border-4 border-black p-4 text-xl font-bold focus:outline-none"
             placeholder="PASSCODE" value={passcode} onChange={e => setPasscode(e.target.value)} />
           <button onClick={handleLogin} className="w-full bg-[#3DDC84] py-4 border-4 border-black font-black uppercase shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">
             Access Dashboard
           </button>
+          <img
+            src="/assets/svg-animated/syncstrike-andy-button.svg"
+            alt="SyncStrike Andy"
+            className="w-full h-24 object-contain border-2 border-black bg-white"
+          />
         </div>
       </div>
     );
@@ -194,9 +230,15 @@ export default function OrganizerApp() {
       </div>
 
       {/* Sticky Top Navbar */}
-      <div className="sticky top-0 z-40 bg-white border-b-4 border-black sh
-adow-[0px_4px_0px_0px_#000] p-4 px-8 flex flex-col md:flex-row justify-between items-center mb-8 gap-4 md:gap-0">
-        <h1 className="text-2xl font-black uppercase tracking-tighter">SyncStrike</h1>
+      <div className="sticky top-0 z-40 bg-white border-b-4 border-black shadow-[0px_4px_0px_0px_#000] p-4 px-8 flex flex-col md:flex-row justify-between items-center mb-8 gap-4 md:gap-0">
+        <div className="flex items-center gap-3">
+          <img
+            src="/assets/svg-static/pixel-android.svg"
+            alt="Android Club Icon"
+            className="w-9 h-9 object-contain"
+          />
+          <h1 className="text-2xl font-black uppercase tracking-tighter">SyncStrike</h1>
+        </div>
         <div className="flex flex-wrap justify-center gap-2">
           {['home', 'leaderboards', 'teams', 'questions', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 font-bold border-2 border-black uppercase text-sm shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all ${activeTab === tab ? 'bg-black text-[#3DDC84]' : 'bg-white hover:bg-gray-100'}`}>
