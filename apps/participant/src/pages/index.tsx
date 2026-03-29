@@ -76,7 +76,10 @@ export default function ParticipantApp() {
 
       socket.on('state_update', (newState) => {
         setGameState(newState);
-        if (newState.buzzerState === 'LIVE') setLockedReason(null);
+        if (newState.buzzerState === 'LIVE') {
+          setLockedReason(null);
+          setLeaderboard([]);
+        }
       });
 
       socket.on('leaderboard_update', ({ leaderboard }) => {
@@ -131,6 +134,12 @@ export default function ParticipantApp() {
   const handleBuzz = () => {
     if (!socketRef.current || !gameState?.activeQuestion) return;
     socketRef.current.emit('buzz', { teamCode, questionId: gameState.activeQuestion.id });
+  };
+
+  const getReactionMs = (hitTime: number) => {
+    const startTime = gameState?.roundStartTime;
+    if (!startTime) return 0;
+    return Math.max(0, hitTime - startTime);
   };
 
   if (!joined) {
@@ -242,7 +251,7 @@ t-center w-full px-6 py-4 bg-white border-4 border-black shadow-[6px_6px_0px_0px
                     </span>
                     <span className="flex-1 text-black">{entry.teamName} {entry.teamCode === teamCode ? '(YOU)' : ''}</span>
                     <span className="bg-white border-2 border-black px-3 py-1 text-lg ml-2">
-                      +{entry.hitTime - (leaderboard[0]?.hitTime || entry.hitTime)}ms
+                      +{getReactionMs(entry.hitTime)}ms
                     </span>
                     {entry.isWrong && <span className="ml-3 text-red-500 text-2xl">❌</span>}
                   </div>

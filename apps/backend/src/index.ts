@@ -39,6 +39,9 @@ async function updateGameState(updates: Partial<GameState>): Promise<GameState> 
   if (updates.buzzerState && updates.buzzerState !== 'LIVE') {
     delete newState.endTime;
   }
+  if (updates.buzzerState === 'LOCKED') {
+    delete newState.roundStartTime;
+  }
   await redis.set('syncstrike:game_state', JSON.stringify(newState));
   io.emit('state_update', newState);
   return newState;
@@ -81,8 +84,8 @@ async function broadcastLeaderboard(questionId: string) {
       answeringTeam = entry;
     }
   }
-  io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard });
-  io.to('projector').to('organizer').emit('answering_team', { team: answeringTeam });
+  io.emit('leaderboard_update', { leaderboard });
+  io.emit('answering_team', { team: answeringTeam });
 }
 
 // === AUTH & PUBLIC ENDPOINTS ===
@@ -252,11 +255,12 @@ app.post('/api/buzzer/start', async (req, res) => {
   const keys = await redis.keys(`syncstrike:spam:${qId}:*`);
   if (keys.length > 0) await redis.del(keys);
   
-  io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
-  io.to('projector').to('organizer').emit('answering_team', { team: null });
+  io.emit('leaderboard_update', { leaderboard: [] });
+  io.emit('answering_team', { team: null });
 
-  const endTime = Date.now() + 10000;
-  await updateGameState({ buzzerState: 'LIVE', activeQuestion: question, endTime, projectorView: 'home' });
+  const roundStartTime = Date.now();
+  const endTime = roundStartTime + 10000;
+  await updateGameState({ buzzerState: 'LIVE', activeQuestion: question, endTime, roundStartTime, projectorView: 'home' });
 
   if (currentTimer) clearTimeout(currentTimer);
   currentTimer = setTimeout(async () => {
@@ -276,11 +280,12 @@ app.post('/api/buzzer/reopen', async (req, res) => {
   
   await redis.del(`syncstrike:leaderboard:${qId}`);
   await redis.del(`syncstrike:wrong:${qId}`);
-  io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
-  io.to('projector').to('organizer').emit('answering_team', { team: null });
+  io.emit('leaderboard_update', { leaderboard: [] });
+  io.emit('answering_team', { team: null });
 
-  const endTime = Date.now() + 10000;
-  await updateGameState({ buzzerState: 'LIVE', endTime, projectorView: 'home' });
+  const roundStartTime = Date.now();
+  const endTime = roundStartTime + 10000;
+  await updateGameState({ buzzerState: 'LIVE', endTime, roundStartTime, projectorView: 'home' });
 
   if (currentTimer) clearTimeout(currentTimer);
   currentTimer = setTimeout(async () => {
@@ -302,8 +307,8 @@ app.post('/api/buzzer/stop', async (req, res) => {
 app.post('/api/buzzer/skip', async (req, res) => {
   if (currentTimer) clearTimeout(currentTimer);
   await updateGameState({ buzzerState: 'LOCKED', activeQuestion: null });
-  io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
-  io.to('projector').to('organizer').emit('answering_team', { team: null });
+  io.emit('leaderboard_update', { leaderboard: [] });
+  io.emit('answering_team', { team: null });
   res.json({ success: true });
 });
 
@@ -330,8 +335,8 @@ app.post('/api/buzzer/correct', async (req, res) => {
 
     if (currentTimer) clearTimeout(currentTimer);
     await updateGameState({ buzzerState: 'LOCKED', activeQuestion: null });
-    io.to('projector').to('organizer').emit('leaderboard_update', { leaderboard: [] });
-    io.to('projector').to('organizer').emit('answering_team', { team: null });
+    io.emit('leaderboard_update', { leaderboard: [] });
+    io.emit('answering_team', { team: null });
     
     res.json({ success: true });
   } catch (err) {

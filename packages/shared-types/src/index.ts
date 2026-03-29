@@ -33,6 +33,7 @@ export interface GameState {
   buzzerState: BuzzerState;
   activeQuestion: Question | null;
   endTime?: number;
+  roundStartTime?: number;
   projectorView: ProjectorView;
 }
 
