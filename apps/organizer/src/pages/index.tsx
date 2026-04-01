@@ -166,7 +166,19 @@ export default function OrganizerApp() {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        const res = await apiCall('/api/bulk', 'POST', { type, mode: uploadMode, data: results.data });
+        const sanitizedData = results.data.map((item: any) => {
+          const sanitizedItem: any = {};
+          for (const key in item) {
+            if (typeof item[key] === 'string') {
+              sanitizedItem[key] = item[key].replace(/\uFFFD/g, "'");
+            } else {
+              sanitizedItem[key] = item[key];
+            }
+          }
+          return sanitizedItem;
+        });
+
+        const res = await apiCall('/api/bulk', 'POST', { type, mode: uploadMode, data: sanitizedData });
         if (res.ok) {
           alert(`Successfully uploaded ${type}.`);
           fetchData();
@@ -266,10 +278,12 @@ export default function OrganizerApp() {
 
               {/* Current Question Card */}
               {gameState?.activeQuestion ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-4 overflow-y-auto">
                   <span className="text-xs font-bold opacity-50 uppercase tracking-widest mb-2">Active Question (ID: {gameState.activeQuestion.id})</span>
-                  <h3 className="text-3xl font-black leading-tight mb-4">{gameState.activeQuestion.text}</h3>
-                  <div className="text-[#3DDC84] bg-black px-4 py-2 font-bold text-lg border-2 border-black">Answer: {gameState.activeQuestion.answer}</div>
+                  <h3 className={`${gameState.activeQuestion.text.length > 150 ? 'text-xl' : gameState.activeQuestion.text.length > 80 ? 'text-2xl' : 'text-3xl lg:text-4xl'} font-black leading-tight mb-4 max-h-[200px] overflow-y-auto break-words whitespace-pre-wrap w-full`}>
+                    {gameState.activeQuestion.text.replace(/\uFFFD/g, "'")}
+                  </h3>
+                  <div className="text-[#3DDC84] bg-black px-4 py-2 font-bold text-lg border-2 border-black w-full break-words">Answer: {gameState.activeQuestion.answer.replace(/\uFFFD/g, "'")}</div>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center opacity-50">
@@ -409,8 +423,8 @@ export default function OrganizerApp() {
                          {q.isComplete && <span className="bg-[#3DDC84] text-black px-2 py-0.5 text-[10px] font-black border-2 border-black uppercase">Completed</span>}
                          {q.isSkipped && !q.isComplete && <span className="bg-gray-500 text-white px-2 py-0.5 text-[10px] font-black border-2 border-black uppercase">Skipped</span>}
                        </div>
-                       <div className="font-black text-xl">{q.text}</div>
-                       <div className="text-sm font-bold text-gray-600 mt-1">Ans: {q.answer}</div>
+                       <div className="font-black text-xl">{q.text.replace(/\uFFFD/g, "'")}</div>
+                       <div className="text-sm font-bold text-gray-600 mt-1">Ans: {q.answer.replace(/\uFFFD/g, "'")}</div>
                     </div>
                     <button onClick={async () => { if(confirm('Delete?')) { await apiCall(`/api/questions/${encodeURIComponent(q.id)}`, 'DELETE'); fetchData(); } }} className="bg-red-500 text-white px-4 py-2 font-bold border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none">Delete</button>
                  </div>

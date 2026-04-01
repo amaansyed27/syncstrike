@@ -156,8 +156,8 @@ export default function ProjectorApp() {
                   <div className="absolute bottom-0 left-0 h-3 bg-black transition-all duration-100" style={{ width: `${(timeLeft / 10) * 100}%` }}></div>
                 )}
                 <h2 className="text-2xl font-black uppercase mb-4 opacity-50">Current Question</h2>
-                <h1 className={`font-black leading-tight ${leaderboard.length > 0 ? 'text-4xl xl:text-5xl' : 'text-5xl xl:text-6xl'}`}>
-                  {gameState.activeQuestion ? gameState.activeQuestion.text : 'Waiting for Next Question...'}
+                <h1 className={`${gameState.activeQuestion?.text && gameState.activeQuestion.text.length > 150 ? 'text-3xl md:text-4xl' : gameState.activeQuestion?.text && gameState.activeQuestion.text.length > 80 ? 'text-4xl md:text-5xl' : leaderboard.length > 0 ? 'text-4xl xl:text-5xl' : 'text-5xl xl:text-6xl'} font-black leading-tight break-words whitespace-pre-wrap w-full`}>
+                  {gameState.activeQuestion ? gameState.activeQuestion.text.replace(/\uFFFD/g, "'") : 'Waiting for Next Question...'}
                 </h1>
                 <div className="mt-6 flex flex-wrap items-center gap-3">
                   <div className={`text-xl font-bold uppercase tracking-widest text-white inline-block px-4 py-2 ${gameState.buzzerState === 'LIVE' ? 'bg-black' : gameState.buzzerState === 'JUDGING' ? 'bg-yellow-500' : 'bg-red-500'}`}>

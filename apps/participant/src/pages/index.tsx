@@ -259,8 +259,10 @@ export default function ParticipantApp() {
         {activeTab === 'buzzer' && (
           <div className="flex-1 flex flex-col items-center justify-center w-full mt-8">
             {gameState?.activeQuestion && (
-              <div className="text-center w-full px-6 py-4 bg-white border-4 border-black shadow-[6px_6px_0px_0px_#000] mb-12">
-                <p className="text-2xl font-bold">{gameState.activeQuestion.text}</p>
+              <div className="text-center w-full px-6 py-4 bg-white border-4 border-black shadow-[6px_6px_0px_0px_#000] mb-12 overflow-y-auto max-h-[150px]">
+                <p className={`${gameState.activeQuestion.text.length > 150 ? 'text-lg' : 'text-2xl'} font-bold break-words whitespace-pre-wrap`}>
+                  {gameState.activeQuestion.text.replace(/\uFFFD/g, "'")}
+                </p>
               </div>
             )}
 
