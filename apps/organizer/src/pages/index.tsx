@@ -397,10 +397,18 @@ export default function OrganizerApp() {
                </select>
             </div>
             <div className="space-y-4">
-               {[...questions].sort((a,b) => Number(a.isComplete) - Number(b.isComplete)).map(q => (
-                 <div key={q.id} className={`flex justify-between items-center border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] ${q.isComplete ? 'bg-[#3DDC84]/20' : 'bg-gray-50'}`}>
+               {[...questions].sort((a, b) => {
+                 const weightA = a.isComplete ? 1 : a.isSkipped ? 2 : 0;
+                 const weightB = b.isComplete ? 1 : b.isSkipped ? 2 : 0;
+                 return weightA - weightB;
+               }).map(q => (
+                 <div key={q.id} className={`flex justify-between items-center border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] ${q.isComplete ? 'bg-[#3DDC84]/20' : q.isSkipped ? 'bg-gray-300' : 'bg-gray-50'}`}>
                     <div>
-                       <div className="text-xs font-bold opacity-50 uppercase">ID: {q.id} {q.isComplete && `| WINNER: ${q.winnerName || q.winnerCode}`}</div>
+                       <div className="flex items-center gap-2 mb-1">
+                         <div className="text-xs font-bold opacity-50 uppercase">ID: {q.id} {q.isComplete && `| WINNER: ${q.winnerName || q.winnerCode}`}</div>
+                         {q.isComplete && <span className="bg-[#3DDC84] text-black px-2 py-0.5 text-[10px] font-black border-2 border-black uppercase">Completed</span>}
+                         {q.isSkipped && !q.isComplete && <span className="bg-gray-500 text-white px-2 py-0.5 text-[10px] font-black border-2 border-black uppercase">Skipped</span>}
+                       </div>
                        <div className="font-black text-xl">{q.text}</div>
                        <div className="text-sm font-bold text-gray-600 mt-1">Ans: {q.answer}</div>
                     </div>
