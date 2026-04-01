@@ -305,6 +305,11 @@ app.post('/api/buzzer/stop', async (req, res) => {
 });
 
 app.post('/api/buzzer/skip', async (req, res) => {
+  const state = await getGameState();
+  if (state.activeQuestion) {
+    await db.collection('questions').doc(state.activeQuestion.id).update({ isSkipped: true });
+  }
+
   if (currentTimer) clearTimeout(currentTimer);
   await updateGameState({ buzzerState: 'LOCKED', activeQuestion: null });
   io.emit('leaderboard_update', { leaderboard: [] });

@@ -9,6 +9,7 @@ export interface Question {
   text: string;
   answer: string;
   isComplete: boolean;
+  isSkipped?: boolean;
   winnerCode?: string;
   winnerName?: string;
 }

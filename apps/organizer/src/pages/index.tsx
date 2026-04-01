@@ -377,7 +377,7 @@ export default function OrganizerApp() {
                        <div className="font-black uppercase">{t.name}</div>
                        <div className="text-xs font-bold opacity-50">Code: {t.code} | Score: {t.totalScore}</div>
                     </div>
-                    <button onClick={async () => { if(confirm('Delete?')) { await apiCall(`/api/teams/${t.code}`, 'DELETE'); fetchData(); } }} className="bg-red-500 text-white px-3 py-1 font-bold border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">Delete</button>
+                    <button onClick={async () => { if(confirm('Delete?')) { await apiCall(`/api/teams/${encodeURIComponent(t.code)}`, 'DELETE'); fetchData(); } }} className="bg-red-500 text-white px-3 py-1 font-bold border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all">Delete</button>
                  </div>
                ))}
             </div>
@@ -404,7 +404,7 @@ export default function OrganizerApp() {
                        <div className="font-black text-xl">{q.text}</div>
                        <div className="text-sm font-bold text-gray-600 mt-1">Ans: {q.answer}</div>
                     </div>
-                    <button onClick={async () => { if(confirm('Delete?')) { await apiCall(`/api/questions/${q.id}`, 'DELETE'); fetchData(); } }} className="bg-red-500 text-white px-4 py-2 font-bold border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none">Delete</button>
+                    <button onClick={async () => { if(confirm('Delete?')) { await apiCall(`/api/questions/${encodeURIComponent(q.id)}`, 'DELETE'); fetchData(); } }} className="bg-red-500 text-white px-4 py-2 font-bold border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none">Delete</button>
                  </div>
                ))}
             </div>
