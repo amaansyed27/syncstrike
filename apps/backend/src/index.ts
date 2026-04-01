@@ -204,19 +204,32 @@ app.post('/api/bulk', async (req, res) => {
   const { type, mode, data } = req.body;
   try {
     const coll = type === 'teams' ? 'teams' : 'questions';
+    const existingSnap = await db.collection(coll).get();
+    const existingIds = new Set(existingSnap.docs.map(d => d.id));
+
     if (mode === 'replace') {
-      const snap = await db.collection(coll).get();
       const batch = db.batch();
-      snap.docs.forEach(doc => batch.delete(doc.ref));
+      existingSnap.docs.forEach(doc => batch.delete(doc.ref));
       await batch.commit();
+      existingIds.clear(); // Because they are all deleted now
     }
 
     const batch = db.batch();
     data.forEach((item: any) => {
       if (type === 'teams' && item.code && item.name) {
-        batch.set(db.collection('teams').doc(item.code.toUpperCase()), { code: item.code.toUpperCase(), name: item.name, totalScore: 0 }, { merge: true });
+        const code = item.code.toUpperCase();
+        const payload: any = { code, name: item.name };
+        if (!existingIds.has(code)) {
+          payload.totalScore = 0;
+        }
+        batch.set(db.collection('teams').doc(code), payload, { merge: true });
       } else if (type === 'questions' && item.id && item.text) {
-        batch.set(db.collection('questions').doc(item.id), { id: item.id, text: item.text, answer: item.answer || '', isComplete: false }, { merge: true });
+        const payload: any = { id: item.id, text: item.text, answer: item.answer || '' };
+        if (!existingIds.has(item.id)) {
+          payload.isComplete = false;
+          payload.isSkipped = false;
+        }
+        batch.set(db.collection('questions').doc(item.id), payload, { merge: true });
       }
     });
     await batch.commit();
@@ -432,6 +445,7 @@ app.post('/api/db/reset-game', async (req, res) => {
     qsSnap.docs.forEach(doc => {
       qsBatch.update(doc.ref, { 
         isComplete: false,
+        isSkipped: admin.firestore.FieldValue.delete(),
         winnerCode: admin.firestore.FieldValue.delete(),
         winnerName: admin.firestore.FieldValue.delete()
       });
